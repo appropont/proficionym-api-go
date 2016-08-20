@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,7 +25,6 @@ func GetSynonyms(word string, apiKeys map[string]string) []string {
 
 	//if cachedSynonyms == "" {
 	fmt.Printf("No cached synonyms found. Fetching from api. \n")
-	//fetchedSynonyms, fetchedSynonymsError := getSynonymsFromDictionaryApi(word, apiKey)
 	fetchedSynonyms, fetchedSynonymsError := getSynonymsFromMultipleApis(word, apiKeys)
 	if fetchedSynonymsError != nil {
 		//do something
@@ -81,7 +81,19 @@ func getSynonymsFromMultipleApis(word string, apiKeys map[string]string) ([]stri
 
 	fmt.Printf("mergedResults: %q \n", mergedResults)
 
-	return mergedResults, nil
+	sort.Strings(mergedResults)
+
+	// removing dupes
+	dedupedResults := []string{}
+	seen := map[string]bool{}
+	for _, val := range mergedResults {
+		if !seen[val] {
+			dedupedResults = append(dedupedResults, val)
+			seen[val] = true
+		}
+	}
+
+	return dedupedResults, nil
 
 }
 
