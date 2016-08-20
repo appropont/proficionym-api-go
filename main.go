@@ -21,8 +21,13 @@ func main() {
         log.Fatal("Error loading .env file")
     }
 
-    synonymsApiKey := os.Getenv("DICTIONARYAPI_API_KEY")
+    //synonymsApiKey := os.Getenv("DICTIONARYAPI_API_KEY")
     //synonymsApiKey := os.Getenv("WORDNIK_API_KEY")
+
+    apiKeys := make(map[string]string)
+    apiKeys["dictionaryapi"] = os.Getenv("DICTIONARYAPI_API_KEY")
+    apiKeys["wordnik"] = os.Getenv("WORDNIK_API_KEY")
+
 
     r := mux.NewRouter()
     r.HandleFunc("/whois/{domain}", func(response http.ResponseWriter, request *http.Request) {
@@ -32,7 +37,7 @@ func main() {
     }).Methods("GET")
 
     r.HandleFunc("/synonyms/{word}", func(response http.ResponseWriter, request *http.Request) {
-        synonymsResult := synonyms.GetSynonyms(mux.Vars(request)["word"], synonymsApiKey)
+        synonymsResult := synonyms.GetSynonyms(mux.Vars(request)["word"], apiKeys)
         jsonSynonyms, _ := json.Marshal(synonymsResult)
         response.Header().Set("Content-Type", "application/json")
         response.Write([]byte(fmt.Sprintf(`{ "synonyms": %s }`, jsonSynonyms)))
