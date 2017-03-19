@@ -36,7 +36,7 @@ func WhoisLookup(domain string) string {
 	if availableResult {
 		return outputStatus(domain, "available")
 	} else if unavailableResult {
-		return outputStatus(domain, "unavailable")
+		return outputStatus(domain, "registered")
 	} else {
 		return outputStatus(domain, "error")
 	}
