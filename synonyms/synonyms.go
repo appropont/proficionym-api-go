@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,26 +18,27 @@ import (
 
 // Public functions
 
+// GetSynonyms from external APIs utilizing a redis cache for repeat requests
 func GetSynonyms(word string, apiKeys map[string]string) []string {
 
-	//cachedSynonyms := getCachedSynonyms(word)
+	cachedSynonyms := getCachedSynonyms(word)
 
-	//if cachedSynonyms == "" {
-	fmt.Printf("No cached synonyms found. Fetching from api. \n")
-	fetchedSynonyms, fetchedSynonymsError := getSynonymsFromMultipleApis(word, apiKeys)
-	if fetchedSynonymsError != nil {
-		//do something
+	if cachedSynonyms == "" {
+		fmt.Printf("No cached synonyms found. Fetching from api. \n")
+		fetchedSynonyms, fetchedSynonymsError := getSynonymsFromMultipleApis(word, apiKeys)
+		if fetchedSynonymsError != nil {
+			//do something
+			return []string;
+		}
+		result := setCachedSynonyms(word, joinSynonymsSlice(fetchedSynonyms))
+
+		fmt.Printf("Setting result: %t \n", result)
+
+		return fetchedSynonyms
 	}
-	result := setCachedSynonyms(word, joinSynonymsSlice(fetchedSynonyms))
 
-	fmt.Printf("Setting result: %b \n", result)
-
-	return fetchedSynonyms
-
-	//} else {
-	//fmt.Printf("Cached synonyms found. \n")
-	//return splitSynonymsString(cachedSynonyms)
-	//}
+	fmt.Printf("Cached synonyms found. \n")
+	return splitSynonymsString(cachedSynonyms)
 
 }
 
@@ -53,7 +53,7 @@ func getSynonymsFromMultipleApis(word string, apiKeys map[string]string) ([]stri
 
 	go func() {
 		defer wg.Done()
-		result, err := getSynonymsFromDictionaryApi(word, apiKeys["dictionaryapi"])
+		result, err := getSynonymsFromDictionaryAPI(word, apiKeys["dictionaryapi"])
 		if err == nil {
 			results <- result
 		}
@@ -97,7 +97,7 @@ func getSynonymsFromMultipleApis(word string, apiKeys map[string]string) ([]stri
 
 }
 
-func getSynonymsFromDictionaryApi(word string, apiKey string) ([]string, error) {
+func getSynonymsFromDictionaryAPI(word string, apiKey string) ([]string, error) {
 
 	url := fmt.Sprintf("http://www.dictionaryapi.com/api/v1/references/thesaurus/xml/%s?key=%s", word, apiKey)
 	synonymsResult, synonymsError := http.Get(url)
@@ -110,7 +110,7 @@ func getSynonymsFromDictionaryApi(word string, apiKey string) ([]string, error) 
 	defer synonymsResult.Body.Close()
 
 	if synonymsResult.StatusCode != 200 {
-		return nil, errors.New(fmt.Sprintf(`{ "status": %q, "code": %d }`, synonymsResult.Status, synonymsResult.StatusCode))
+		return nil, fmt.Errorf(`{ "status": %q, "code": %d }`, synonymsResult.Status, synonymsResult.StatusCode)
 	}
 
 	xmlParser := xml.NewDecoder(synonymsResult.Body)
@@ -128,19 +128,19 @@ func getSynonymsFromDictionaryApi(word string, apiKey string) ([]string, error) 
 
 		//fmt.Printf("Handling token \n")
 		switch se := token.(type) {
-		case xml.StartElement:
-			if se.Name.Local == "syn" || se.Name.Local == "rel" {
-				shouldCaptureText = true
-			}
-			break
-		case xml.EndElement:
-			break
-		default:
-			if shouldCaptureText == true {
-				rawSynonyms.WriteString(string([]byte(se.(xml.CharData))))
-				rawSynonyms.WriteString(",")
-				shouldCaptureText = false
-			}
+			case xml.StartElement:
+				if se.Name.Local == "syn" || se.Name.Local == "rel" {
+					shouldCaptureText = true
+				}
+				break
+			case xml.EndElement:
+				break
+			default:
+				if shouldCaptureText == true {
+					rawSynonyms.WriteString(string([]byte(se.(xml.CharData))))
+					rawSynonyms.WriteString(",")
+					shouldCaptureText = false
+				}
 		}
 
 	}
@@ -154,13 +154,14 @@ func getSynonymsFromDictionaryApi(word string, apiKey string) ([]string, error) 
 	return splitSynonymsString(wordsAfterSemicolons), nil
 }
 
-type WordnikWordSet struct {
+//
+type wordnikWordSet struct {
 	RelationshipType string
-	Words            []string
+	Words []string
 }
 
-type WordnikResult struct {
-	Results []WordnikWordSet
+type wordnikResult struct {
+	Results []wordnikWordSet
 }
 
 // beginnings of wordnik api integration
@@ -182,10 +183,10 @@ func getSynonymsFromWordnik(word string, apiKey string) ([]string, error) {
 	fmt.Printf("Response Status: %s \n", synonymsResult.Status)
 
 	if synonymsResult.StatusCode != 200 {
-		return nil, errors.New(fmt.Sprintf(`{ "status": %q, "code": %d }`, synonymsResult.Status, synonymsResult.StatusCode))
+		return nil, fmt.Errorf(`{ "status": %q, "code": %d }`, synonymsResult.Status, synonymsResult.StatusCode)
 	}
 
-	var decodedBody []WordnikWordSet
+	var decodedBody []wordnikWordSet
 	if decoderError := json.NewDecoder(synonymsResult.Body).Decode(&decodedBody); decoderError != nil {
 		log.Fatal(decoderError)
 		return nil, decoderError
@@ -193,12 +194,7 @@ func getSynonymsFromWordnik(word string, apiKey string) ([]string, error) {
 
 	var mergedResults []string
 	for _, wordSet := range decodedBody {
-		// log.Print("wordSet relationship Type")
-		// log.Print(wordSet.RelationshipType)
 		words := wordSet.Words
-		// log.Print("words")
-		// log.Print(words)
-		// log.Print(reflect.TypeOf(words))
 
 		switch wordSet.RelationshipType {
 			case 

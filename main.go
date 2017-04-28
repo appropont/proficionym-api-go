@@ -29,6 +29,7 @@ func main() {
 	r.HandleFunc("/whois/{domain}", func(response http.ResponseWriter, request *http.Request) {
 		whoisResult := domains.WhoisLookup(mux.Vars(request)["domain"])
 		response.Header().Set("Content-Type", "application/json")
+		response.Header().Set("Backend", "Go")
 		response.Write([]byte(whoisResult))
 	}).Methods("GET")
 
@@ -36,11 +37,13 @@ func main() {
 		synonymsResult := synonyms.GetSynonyms(mux.Vars(request)["word"], apiKeys)
 		jsonSynonyms, _ := json.Marshal(synonymsResult)
 		response.Header().Set("Content-Type", "application/json")
+		response.Header().Set("Backend", "Go")
 		response.Write([]byte(fmt.Sprintf(`{ "synonyms": %s }`, jsonSynonyms)))
 	}).Methods("GET")
 
 	r.HandleFunc("/", func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set("Content-Type", "application/json")
+		response.Header().Set("Backend", "Go")
 		response.Write([]byte(`{ "name": "Proficionym API", "version": "0.0.1" }`))
 	}).Methods("GET")
 
